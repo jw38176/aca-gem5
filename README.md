@@ -1,5 +1,5 @@
 Intended workflow:
-students run simulate.py with specified CPU paramteres. This launches Gem5 running the micro-lisp benchmark. This then runs gem5tomcpat.py on the output stats file, then launches mcpat with the generated input to attain the power usage.
+students run simulate.py with specified CPU paramteres. This launches Gem5 running the gapbs tc benchmark. This then runs gem5tomcpat.py on the output stats file, then launches mcpat with the generated input to attain the power usage.
 
 Build gem5:
 
@@ -15,18 +15,18 @@ cd mcpat
 make -j 8
 ```
 
-Build micro-lisp:
+Build gapbs
 
 ```
-cd benchmarks/micro-lisp
+cd benchmarks/gapbs
 make -j 8
 ```
 
 Test micro-lisp:
 
-`./mlisp89 examples/`
+`./tc -u 10 -n 1 -k 16`
 
-The argument specifies the directory containing the input lisp programs. You can add and remove these programs in this directory (or create a new directory) to change the simulation behaviour and runtime. 
+This specifies the number of verticies (2^n), number of iterations and the vertex degree. The original benchmark generates a random graph every time, whereas the one in this repo has been modified to generate the same graph every time.
 
 Run a simulation:
 
