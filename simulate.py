@@ -4,9 +4,9 @@ import subprocess
 import re
 
 pid = str(os.getpid())
-gem5 = "/work/muke/aca-gem5/gem5/"
-mcpat = "/work/muke/aca-gem5/mcpat/"
-gem5tomcpat = "/work/muke/aca-gem5/gem5tomcpat.py"
+gem5 = "/homes/lp721/aca-gem5/gem5/"
+mcpat = "/homes/lp721/aca-gem5/mcpat/"
+gem5tomcpat = "/homes/lp721/aca-gem5/gem5tomcpat.py"
 benchmark = "./benchmarks/gapbs/tc"
 benchmark_args = "-u 10 -n 1 -k 16"
 
