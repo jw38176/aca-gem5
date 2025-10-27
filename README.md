@@ -22,7 +22,7 @@ cd benchmarks/gapbs
 make -j 8
 ```
 
-Test micro-lisp:
+Test tc:
 
 `./tc -u 10 -n 1 -k 16`
 
