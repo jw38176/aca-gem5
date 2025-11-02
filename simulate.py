@@ -14,7 +14,8 @@ parser = argparse.ArgumentParser(description="Script to run Gem5 ACA Simulations
 
 parser.add_argument('--name', type=str, help="Name used for results file. If unspecified, process ID of the script is used.")
 parser.add_argument('--gen-trace', action='store_true', help="Generate an instruction trace for Konata (warning: can use up disk space fast!)")
-parser.add_argument('--pipeline-width', type=int, help="Number of instructions in each stage of the pipeline at a time. Default = 10")
+parser.add_argument('--pipeline-width', type=int, help="Number of instructions in each stage of the pipeline at a time, excluding issue and writeback. Default = 10")
+parser.add_argument('--issue-wb-pipeline-width', type=int, help="Number of instructions in each stage of the issue and writeback pipeline stages a time. Default = 19")
 parser.add_argument('--rob-size', type=int, help="Number of reorder buffer entries. Default = 918.")
 parser.add_argument('--num-int-phys-regs', type=int, help="Number of integer physical registers. Default = 918.")
 parser.add_argument('--num-float-phys-regs', type=int, help="Number of float physical registers. Default = 918.")
@@ -47,9 +48,20 @@ if args.pipeline_width is not None:
     if args.pipeline_width < 4:
         print("Pipeline width must be at least 4!")
         exit(1)
-    stages = ["fetch", "decode", "rename", "dispatch", "issue", "wb", "squash", "commit"]
+    stages = ["fetch", "decode", "rename", "dispatch", "squash", "commit"]
     for stage in stages:
         configs.append(prefix+stage+"Width="+str(args.pipeline_width)+"\" ")
+
+if args.issue_wb_pipeline_width is not None:
+    if not args.issue_wb_pipeline_width:
+        print("Pipeline width cannot be 0!")
+        exit(1)
+    if args.issue_wb_pipeline_width < 9:
+        print("Issue and WB pipeline width must be at least 9!")
+        exit(1)
+    stages = ["issue", "wb"]
+    for stage in stages:
+        configs.append(prefix+stage+"Width="+str(args.issue_wb_pipeline_width)+"\" ")
 
 if args.window_size:
     values = args.window_size.split(",")
