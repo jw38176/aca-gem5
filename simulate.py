@@ -48,6 +48,9 @@ if args.pipeline_width is not None:
     if args.pipeline_width < 4:
         print("Pipeline width must be at least 4!")
         exit(1)
+    elif args.pipeline_width > 23:
+        print("Pipeline width cannot be higher than 23!")
+        exit(1)
     stages = ["fetch", "decode", "rename", "dispatch", "squash", "commit"]
     for stage in stages:
         configs.append(prefix+stage+"Width="+str(args.pipeline_width)+"\" ")
@@ -58,6 +61,9 @@ if args.issue_wb_pipeline_width is not None:
         exit(1)
     if args.issue_wb_pipeline_width < 9:
         print("Issue and WB pipeline width must be at least 9!")
+        exit(1)
+    elif args.issue_wb_pipeline_width > 23:
+        print("Issue and WB pipeline width cannot be higher than 23!")
         exit(1)
     stages = ["issue", "wb"]
     for stage in stages:
