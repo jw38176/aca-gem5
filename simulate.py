@@ -4,25 +4,25 @@ import subprocess
 import re
 
 pid = str(os.getpid())
-gem5 = "/homes/lp721/aca-gem5/gem5/"
-mcpat = "/homes/lp721/aca-gem5/mcpat/"
-gem5tomcpat = "/homes/lp721/aca-gem5/gem5tomcpat.py"
-benchmark = "/homes/lp721/aca-gem5/benchmarks/gapbs/tc"
-benchmark_args = "-u 10 -n 1 -k 16"
+gem5 = "/homes/jkw20/aca-gem5/gem5/"
+mcpat = "/homes/jkw20/aca-gem5/mcpat/"
+gem5tomcpat = "/homes/jkw20/aca-gem5/gem5tomcpat.py"
+benchmark = "/homes/jkw20/aca-gem5/benchmarks/bzip2-1.0.8/bzip2"
+benchmark_args = "-1ckf /homes/jkw20/aca-gem5/benchmarks/bzip2-1.0.8/input/bee.txt"
 
-parser = argparse.ArgumentParser(description="Script to run Gem5 ACA Simulations. This script will create several output files in whatever directory you run it, so you may want to create a new directory to keep things clean! Contact lp721@ic.ac.uk with any problems.")
+
+parser = argparse.ArgumentParser(description="Script to run gem5 ACA Simulations. This script will create several output files in whatever directory you run it, so you may want to create a new directory to keep things clean! Contact jkw20@ic.ac.uk with any problems.")
 
 parser.add_argument('--name', type=str, help="Name used for results file. If unspecified, process ID of the script is used.")
 parser.add_argument('--gen-trace', action='store_true', help="Generate an instruction trace for Konata (warning: can use up disk space fast!)")
-parser.add_argument('--pipeline-width', type=int, help="Number of instructions in each stage of the pipeline at a time, excluding issue and writeback. Default = 10")
-parser.add_argument('--issue-wb-pipeline-width', type=int, help="Number of instructions in each stage of the issue and writeback pipeline stages a time. Default = 19")
-parser.add_argument('--rob-size', type=int, help="Number of reorder buffer entries. Default = 918.")
-parser.add_argument('--num-int-phys-regs', type=int, help="Number of integer physical registers. Default = 918.")
-parser.add_argument('--num-float-phys-regs', type=int, help="Number of float physical registers. Default = 918.")
-parser.add_argument('--num-vec-phys-regs', type=int, help="Number of vector physical registers. Default = 918.")
-parser.add_argument('--iq-size', type=int, help="Number of instruction queue entries. Default = 559.")
-parser.add_argument('--lq-size', type=int, help="Number of load queue entries. Default = 132.")
-parser.add_argument('--sq-size', type=int, help="Number of store queue entries. Default = 72.")
+parser.add_argument('--pipeline-width', type=int, help="Number of instructions in each stage of the pipeline at a time. Default = 8.")
+parser.add_argument('--rob-size', type=int, help="Number of reorder buffer entries. Default = 512.")
+parser.add_argument('--num-int-phys-regs', type=int, help="Number of integer physical registers. Default = 512.")
+parser.add_argument('--num-float-phys-regs', type=int, help="Number of float physical registers. Default = 512.")
+parser.add_argument('--num-vec-phys-regs', type=int, help="Number of vector physical registers. Default = 512.")
+parser.add_argument('--iq-size', type=int, help="Number of instruction queue entries. Default = 337.")
+parser.add_argument('--lq-size', type=int, help="Number of load queue entries. Default = 169.")
+parser.add_argument('--sq-size', type=int, help="Number of store queue entries. Default = 93.")
 parser.add_argument('--lsq-size', type=int, help="Set load and store queue entries together.")
 parser.add_argument('--window-size', type=str, help="Sets the size of the whole instruction window. Pass comma separated list of numbers to specify ROB, IQ and LSQ respectively. Number of physical regs is set to match ROB size.")
 parser.add_argument('--local-pred-size', type=int, help="Number of local branch predictor entries. Default = 1024.")
@@ -48,26 +48,9 @@ if args.pipeline_width is not None:
     if args.pipeline_width < 4:
         print("Pipeline width must be at least 4!")
         exit(1)
-    elif args.pipeline_width > 23:
-        print("Pipeline width cannot be higher than 23!")
-        exit(1)
-    stages = ["fetch", "decode", "rename", "dispatch", "squash", "commit"]
+    stages = ["fetch", "decode", "rename", "dispatch", "issue", "wb", "squash", "commit"]
     for stage in stages:
         configs.append(prefix+stage+"Width="+str(args.pipeline_width)+"\" ")
-
-if args.issue_wb_pipeline_width is not None:
-    if not args.issue_wb_pipeline_width:
-        print("Pipeline width cannot be 0!")
-        exit(1)
-    if args.issue_wb_pipeline_width < 9:
-        print("Issue and WB pipeline width must be at least 9!")
-        exit(1)
-    elif args.issue_wb_pipeline_width > 23:
-        print("Issue and WB pipeline width cannot be higher than 23!")
-        exit(1)
-    stages = ["issue", "wb"]
-    for stage in stages:
-        configs.append(prefix+stage+"Width="+str(args.issue_wb_pipeline_width)+"\" ")
 
 if args.window_size:
     values = args.window_size.split(",")
@@ -215,16 +198,16 @@ if args.l2_size is not None:
     configs.append("--l2_size="+str(args.l2_size)+"MB ")
 else: configs.append("--l2_size=8MB ")
 
-if args.gen_trace: name = "/vol/bitbucket/lp721/"+name
+if args.gen_trace: name = "/vol/bitbucket/jkw20/"+name
 os.makedirs(name, exist_ok=True)
 
 gem5_outdir = name+"/gem5.out"
 gem5_bin = "build/X86/gem5.opt --debug-flags=O3PipeView --debug-file=trace.out" if args.gen_trace else "build/X86/gem5.fast"
-gem5_run = gem5+gem5_bin+" --outdir="+gem5_outdir+" "+gem5+"configs/deprecated/example/se.py --cpu-type=DerivO3CPU --caches --l2cache -c "+benchmark+" --options=\""+benchmark_args+"\" "
+gem5_run = gem5+gem5_bin+" --outdir="+gem5_outdir+" "+gem5+"configs/deprecated/example/se.py --cpu-type=DerivO3CPU --caches --l2cache -c "+benchmark+" --options=\""+benchmark_args+"\" --output=/dev/null "
 gem5_run += ' '.join(configs)
 subprocess.run(gem5_run, shell=True, check=True)
 
-gem5tomcpat_run = "python3 "+gem5tomcpat+" --config "+gem5_outdir+"/config.json --stats "+gem5_outdir+"/stats.txt --template "+mcpat+"/ProcessorDescriptionFiles/template_x86.xml --output "+name+"/mcpat-in.xml"
+gem5tomcpat_run = "python "+gem5tomcpat+" --config "+gem5_outdir+"/config.json --stats "+gem5_outdir+"/stats.txt --template "+mcpat+"/ProcessorDescriptionFiles/template_x86.xml --output "+name+"/mcpat-in.xml"
 subprocess.run(gem5tomcpat_run, shell=True, check=True, capture_output=True)
 
 mcpat_run = mcpat+"mcpat -infile "+name+"/mcpat-in.xml -print_level 1 -opt_for_clk 1"
