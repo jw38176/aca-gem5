@@ -10,24 +10,27 @@ gem5tomcpat = "/homes/jkw20/aca-gem5/gem5tomcpat.py"
 benchmark = "/homes/jkw20/aca-gem5/benchmarks/bzip2-1.0.8/bzip2"
 benchmark_args = "-1ckf /homes/jkw20/aca-gem5/benchmarks/bzip2-1.0.8/input/bee.txt"
 
+arch_int_regs = 39
+arch_float_regs = 48
 
 parser = argparse.ArgumentParser(description="Script to run gem5 ACA Simulations. This script will create several output files in whatever directory you run it, so you may want to create a new directory to keep things clean! Contact jkw20@ic.ac.uk with any problems.")
 
 parser.add_argument('--name', type=str, help="Name used for results file. If unspecified, process ID of the script is used.")
 parser.add_argument('--gen-trace', action='store_true', help="Generate an instruction trace for Konata (warning: can use up disk space fast!)")
-parser.add_argument('--pipeline-width', type=int, help="Number of instructions in each stage of the pipeline at a time. Default = 8.")
-parser.add_argument('--rob-size', type=int, help="Number of reorder buffer entries. Default = 512.")
-parser.add_argument('--num-int-phys-regs', type=int, help="Number of integer physical registers. Default = 512.")
-parser.add_argument('--num-float-phys-regs', type=int, help="Number of float physical registers. Default = 512.")
-parser.add_argument('--num-vec-phys-regs', type=int, help="Number of vector physical registers. Default = 512.")
-parser.add_argument('--iq-size', type=int, help="Number of instruction queue entries. Default = 337.")
-parser.add_argument('--lq-size', type=int, help="Number of load queue entries. Default = 169.")
-parser.add_argument('--sq-size', type=int, help="Number of store queue entries. Default = 93.")
+parser.add_argument('--pipeline-width', type=int, help="Number of instructions in the fetch, decode, rename, dispatch, squash and commit stages at a time. Default = 10. ")
+parser.add_argument('--issue-width', type=int, help="Number of instructions issued and written back per cycle. Default = 19.")
+parser.add_argument('--rob-size', type=int, help="Number of reorder buffer entries. Default = 918.")
+parser.add_argument('--num-int-phys-regs', type=int, help="Number of integer physical registers. Default = 918.")
+parser.add_argument('--num-float-phys-regs', type=int, help="Number of float physical registers. Default = 918.")
+parser.add_argument('--num-vec-phys-regs', type=int, help=argparse.SUPPRESS)
+parser.add_argument('--iq-size', type=int, help="Number of instruction queue entries. Default = 559.")
+parser.add_argument('--lq-size', type=int, help="Number of load queue entries. Default = 132.")
+parser.add_argument('--sq-size', type=int, help="Number of store queue entries. Default = 72.")
 parser.add_argument('--lsq-size', type=int, help="Set load and store queue entries together.")
-parser.add_argument('--window-size', type=str, help="Sets the size of the whole instruction window. Pass comma separated list of numbers to specify ROB, IQ and LSQ respectively. Number of physical regs is set to match ROB size.")
-parser.add_argument('--local-pred-size', type=int, help="Number of local branch predictor entries. Default = 1024.")
-parser.add_argument('--global-pred-size', type=int, help="Number of global branch predictor entries. Default = 2048.")
-parser.add_argument('--btb-size', type=int, help="Number of branch target buffer entries (for branch predictor). Default = 1024.")
+parser.add_argument('--window-size', type=str, help="Sets the size of the whole instruction window. Pass comma separated list of numbers to specify ROB, IQ and LSQ respectively. Integer physical registers are set to ROB + "+str(arch_int_regs)+".")
+parser.add_argument('--local-pred-size', type=int, help="Number of local branch predictor entries. The local history table is set to the same size. Default = 2048.")
+parser.add_argument('--global-pred-size', type=int, help="Number of global branch predictor entries. Default = 8192.")
+parser.add_argument('--btb-size', type=int, help="Number of branch target buffer entries (for branch predictor). Default = 4096.")
 parser.add_argument('--ras-size', type=int, help="Number of return address stack entries (for branch predictor). Default = 16.")
 parser.add_argument('--branch-pred-size', type=str, help="Sets the size of the whole branch predictor. Pass comma separated list of numbers to specify local predictor size, global predictor size, branch target buffer and return address stack respectively.")
 parser.add_argument('--l1-data-size', type=int, help="Size in KB of L1 data cache. Default = 128.")
@@ -41,16 +44,29 @@ prefix = "-P \"system.cpu[:]."
 branch_prefix = "-P \"system.cpu[:].branchPred."
 configs = []
 
+max_width = 23
+if args.issue_width is not None and (args.issue_width < 1 or args.issue_width > max_width):
+    print("Issue width must be between 1 and "+str(max_width)+"!")
+    exit(1)
+issue_width = args.issue_width
 if args.pipeline_width is not None:
-    if not args.pipeline_width:
-        print("Pipeline width cannot be 0!")
-        exit(1)
     if args.pipeline_width < 4:
         print("Pipeline width must be at least 4!")
         exit(1)
-    stages = ["fetch", "decode", "rename", "dispatch", "issue", "wb", "squash", "commit"]
+    if args.pipeline_width > max_width:
+        print("Pipeline width cannot be more than "+str(max_width)+"!")
+        exit(1)
+    stages = ["fetch", "decode", "rename", "dispatch", "squash", "commit"]
     for stage in stages:
         configs.append(prefix+stage+"Width="+str(args.pipeline_width)+"\" ")
+    if issue_width is None:
+        issue_width = round(args.pipeline_width * 19 / 10)
+        if issue_width > max_width:
+            issue_width = max_width
+            print("Note: issue/writeback width capped at "+str(max_width)+".")
+if issue_width is not None:
+    configs.append(prefix+"issueWidth="+str(issue_width)+"\" ")
+    configs.append(prefix+"wbWidth="+str(issue_width)+"\" ")
 
 if args.window_size:
     values = args.window_size.split(",")
@@ -73,10 +89,7 @@ if args.window_size:
             exit(1)
         configs.append(prefix+component+"="+size+"\" ")
     configs.append(prefix+"SQEntries"+"="+values[-1]+"\" ")
-    num_regs = values[0] if int(values[0]) >= 49 else 49
-    regs = ["numPhysIntRegs", "numPhysFloatRegs", "numPhysVecRegs"]
-    for reg in regs:
-        configs.append(prefix+reg+"="+str(num_regs)+"\" ")
+    configs.append(prefix+"numPhysIntRegs="+str(int(values[0])+arch_int_regs)+"\" ")
 
 if args.branch_pred_size:
     values = args.branch_pred_size.split(",")
@@ -120,11 +133,8 @@ if args.num_float_phys_regs is not None:
         print("Minimum number of physical registers must be at least 49!")
         exit(1)
     configs.append(prefix+"numPhysFloatRegs="+str(args.num_float_phys_regs)+"\" ")
-if args.num_vec_phys_regs is not None: 
-    if args.num_vec_phys_regs < 49:
-        print("Minimum number of physical registers must be at least 49!")
-        exit(1)
-    configs.append(prefix+"numPhysVecRegs="+str(args.num_vec_phys_regs)+"\" ")
+if args.num_vec_phys_regs is not None:
+    print("Note: --num-vec-phys-regs is ignored; x86 in gem5 has no real vector registers and McPAT does not model them.")
 if args.iq_size is not None: 
     if not args.iq_size:
         print("Number of IQ entries cannot be zero!")
@@ -212,8 +222,22 @@ subprocess.run(gem5tomcpat_run, shell=True, check=True, capture_output=True)
 
 mcpat_run = mcpat+"mcpat -infile "+name+"/mcpat-in.xml -print_level 1 -opt_for_clk 1"
 mcpat_output = subprocess.run(mcpat_run, shell=True, check=True, capture_output=True, text=True).stdout
-power_output = mcpat_output.split("\n")[21:26]
-power_output = '\n'.join(power_output)
+processor_block = re.search(r'^Processor:\s*\n(.*?)\n\s*\n', mcpat_output, re.S | re.M)
+if not processor_block:
+    print("Error parsing McPAT output")
+    exit(1)
+processor_power = {}
+for line in processor_block.group(1).split("\n"):
+    match = re.match(r'\s*(.+?) = (\S+)', line)
+    if match:
+        processor_power[match.group(1)] = match.group(2)
+power_fields = [("Area", "mm^2"), ("Peak Dynamic", "W"), ("Subthreshold Leakage", "W"), ("Gate Leakage", "W"), ("Runtime Dynamic", "W")]
+if any(field not in processor_power for field, _ in power_fields):
+    print("Error parsing McPAT output")
+    exit(1)
+power_lines = ["    "+field+" = "+processor_power[field]+" "+unit for field, unit in power_fields]
+total_power = sum(float(processor_power[field]) for field in ["Subthreshold Leakage", "Gate Leakage", "Runtime Dynamic"])
+power_output = '\n'.join(power_lines)
 with open(name+"/gem5.out/stats.txt", "r") as gem5_output:
     cpi = None
     simseconds = None
