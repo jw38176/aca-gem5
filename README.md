@@ -15,7 +15,7 @@ cd mcpat
 make -j 8
 ```
 
-Run a simulation:
+Run a simulation: (you may need to modify the paths defined in `simulate.py`)
 
 ```
 python simulate.py
